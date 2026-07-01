@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>🚑 Smart Ambulance System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Particle Canvas -->
+<canvas id="canvas-bg"></canvas>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- SOS MODAL -->
+<div id="sosModal">
+  <div class="sos-modal-box">
+    <div class="sos-modal-icon">🚨</div>
+    <div class="sos-modal-title">SOS ACTIVATED</div>
+    <div class="sos-modal-sub">Alerting nearest hospital & emergency services</div>
+    <div class="sos-timer" id="sosTimer">03</div>
+    <p style="color:var(--muted);font-size:13px;margin:10px 0 20px">Dispatching in seconds...</p>
+    <button class="btn-red" onclick="cancelSOS()">✕ Cancel</button>
+  </div>
+</div>
+
+<!-- BACK BUTTON -->
+<button id="backBtn" onclick="goBack()">⬅ Back</button>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<div class="hero" id="heroSection">
+  <div class="hero-bg-img"></div>
+  <div class="hero-overlay"></div>
+  <div class="pulse-rings">
+    <div class="pulse-ring"></div>
+    <div class="pulse-ring"></div>
+    <div class="pulse-ring"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">Emergency Response Network</div>
+    <h1 class="hero-title">🚑 Smart<br><span>Ambulance</span> System</h1>
+    <p class="hero-subtitle">AI-powered routing · Real-time dispatch · Life-saving technology</p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num" id="stat-count">—</div>
+        <div class="hero-stat-label">Hospitals Live</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">4.2m</div>
+        <div class="hero-stat-label">Avg Response</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">24/7</div>
+        <div class="hero-stat-label">Availability</div>
+      </div>
+    </div>
+
+    <div class="role-cards">
+      <div class="role-card" onclick="selectRole('hospital')">
+        <span class="role-icon">🏥</span>
+        <div class="role-label">Hospital</div>
+        <div class="role-desc">Manage beds · Specialists · Status</div>
+      </div>
+      <div class="role-card" onclick="selectRole('driver')">
+        <span class="role-icon">🚑</span>
+        <div class="role-label">Driver / Patient</div>
+        <div class="role-desc">Find hospitals · Route · ETA</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HOSPITAL AUTH ═══════════════ -->
+<div class="panel" id="hospitalAuth" style="display:none;">
+  <h2><span></span> Hospital Login</h2>
+  <p class="section-label">Credentials</p>
+  <input id="email" type="email" placeholder="Email address">
+  <input id="password" type="password" placeholder="Password">
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button onclick="signup()" style="flex:1" class="btn-cyan">Sign Up</button>
+    <button onclick="login()" style="flex:1">Login</button>
+  </div>
+  <img src="https://cdn-icons-png.flaticon.com/512/4320/4320371.png" class="hospital-bottom">
+</div>
+
+<!-- ═══════════════ HOSPITAL PANEL ═══════════════ -->
+<div class="panel" id="hospitalForm" style="display:none;">
+
+  <!-- ── HEADER WITH ALERT BADGE ── -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <h2 style="margin-bottom:0"><span></span> Hospital Dashboard</h2>
+    <div style="position:relative;cursor:pointer" onclick="document.getElementById('alertSection').scrollIntoView({behavior:'smooth'})">
+      <span style="font-size:24px">🔔</span>
+      <span id="alertBadge" style="
+        display:none;
+        position:absolute; top:-6px; right:-6px;
+        background:#e63946; color:#fff;
+        font-size:11px; font-weight:700;
+        width:18px; height:18px;
+        border-radius:50%;
+        align-items:center; justify-content:center;
+        font-family:'Rajdhani',sans-serif;
+        border:2px solid #020817;
+      ">0</span>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot green" id="onlineStatusDot"></div>
+    <span id="onlineStatusText">Hospital Online — Visible to drivers</span>
+  </div>
+
+  <!-- ── HOSPITAL INFO ── -->
+  <p class="section-label">Basic Info</p>
+  <input id="hname" placeholder="Hospital Name">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <input id="beds" type="number" placeholder="General Beds">
+    <input id="icu" type="number" placeholder="ICU Beds">
+  </div>
+
+  <p class="section-label">Availability Status</p>
+  <select id="availStatus">
+    <option value="available">✅ Available — Accepting Patients</option>
+    <option value="limited">⚠️ Limited Capacity</option>
+    <option value="full">🔴 Full — ICU/Beds Full</option>
+    <option value="emergency_only">🚨 Emergency Only</option>
+  </select>
+
+  <p class="section-label">Specialists</p>
+  <div id="specialists"></div>
+  <button onclick="addSpecialist()" class="btn-sm btn-cyan">➕ Add Specialist</button>
+
+  <p class="section-label">Contact & Services</p>
+  <input id="phone" placeholder="Hospital Phone Number">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+    <label class="etype-pill" id="svc-trauma">🩺 Trauma</label>
+    <label class="etype-pill" id="svc-cardio">❤️ Cardiac</label>
+    <label class="etype-pill" id="svc-burn">🔥 Burn Unit</label>
+    <label class="etype-pill" id="svc-peds">👶 Pediatric</label>
+    <label class="etype-pill" id="svc-neuro">🧠 Neuro</label>
+    <label class="etype-pill" id="svc-ortho">🦴 Orthopedic</label>
+  </div>
+
+  <p class="section-label">Location</p>
+  <button onclick="openLocationOptions()" class="btn-sm">📍 Set Location</button>
+  <div id="locationOptions" style="display:none;margin-top:8px">
+    <button onclick="autoLocation()" class="btn-sm btn-green">Auto Detect</button>
+    <button onclick="manualLocation()" class="btn-sm">Manual Entry</button>
+  </div>
+  <div id="manualInput" style="display:none;margin-top:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input id="manualLat" placeholder="Latitude">
+      <input id="manualLng" placeholder="Longitude">
+    </div>
+    <button onclick="saveManualLocation()" class="btn-sm btn-cyan">Save</button>
+  </div>
+  <p id="hospitalLocationText" style="color:var(--cyan);font-size:13px;margin-top:8px"></p>
+
+  <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="saveHospital()" class="btn-green" style="flex:1">💾 Save All</button>
+    <button onclick="deleteHospital()" class="btn-red btn-sm">🗑 Delete</button>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       🚨 SOS ALERT INBOX
+       New section — real-time alerts from drivers
+  ════════════════════════════════════════ -->
+  <div id="alertSection">
+    <p class="section-label" style="margin-top:28px">
+      🚨 SOS Alert Inbox
+      <span id="alertBadge2" style="
+        background:#e63946; color:#fff; font-size:11px; font-weight:700;
+        padding:1px 7px; border-radius:10px; margin-left:6px;
+        font-family:'Rajdhani',sans-serif; display:none;
+      "></span>
+    </p>
+
+    <!-- Live alert feed -->
+    <div id="alertInbox" style="max-height:400px;overflow-y:auto">
+      <p style="color:var(--muted);font-size:13px;text-align:center;padding:10px">
+        No alerts yet. They will appear here in real time.
+      </p>
+    </div>
+
+    <!-- Mini map shown when Accept is clicked -->
+    <div id="hospitalMiniMap" style="
+      display:none; height:260px; border-radius:14px;
+      margin-top:14px; border:1px solid var(--border); overflow:hidden;
+    "></div>
+
+    <p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">
+      ● Alerts update automatically — no refresh needed
+    </p>
+  </div>
+
+</div>
+<!-- end hospitalForm -->
+
+<!-- ═══════════════ DRIVER PANEL ═══════════════ -->
+<div class="panel" id="driverPanel" style="display:none;max-width:720px;">
+  <h2><span></span> Emergency Dispatch</h2>
+
+  <!-- SOS -->
+  <div class="sos-wrap">
+    <button class="sos-btn" onclick="triggerSOS()">🆘 SOS</button>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">
+      Press to send real-time alert to nearest hospital
+    </p>
+  </div>
+
+  <!-- Emergency Type -->
+  <p class="section-label">Emergency Type</p>
+  <div class="emergency-types" id="emergencyTypes">
+    <div class="etype-pill active" onclick="selectEmergency(this)">🩸 General</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">❤️ Cardiac</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">🧠 Stroke</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">🦴 Trauma</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">🔥 Burns</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">👶 Pediatric</div>
+    <div class="etype-pill" onclick="selectEmergency(this)">🤰 Maternity</div>
+  </div>
+
+  <!-- Location -->
+  <p class="section-label">Your Location</p>
+  <button onclick="getLocation()" class="btn-cyan">📍 Detect My Location</button>
+  <div id="locationText" style="font-size:13px;color:var(--muted);margin:8px 0"></div>
+
+  <!-- Weather -->
+  <div id="weatherWidget" style="display:none">
+    <div class="weather-icon" id="weatherIcon">☀️</div>
+    <div class="weather-info">
+      <div class="weather-temp" id="weatherTemp">—</div>
+      <div class="weather-desc" id="weatherDesc">Fetching conditions...</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-align:right">
+      <div>Visibility</div>
+      <div id="weatherVisib" style="color:var(--cyan)">—</div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <!-- ETA Box -->
+  <div id="etaBox" style="display:none">
+    <div class="eta-title">Estimated Time of Arrival</div>
+    <div class="eta-time" id="etaTimeNum">—</div>
+    <div class="eta-dest" id="etaDest">—</div>
+  </div>
+
+  <!-- Filter bar -->
+  <div style="display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--muted)">Filter:</span>
+    <button class="btn-sm active-filter" onclick="filterHospitals('all')"       id="f-all">All</button>
+    <button class="btn-sm"              onclick="filterHospitals('icu')"       id="f-icu">ICU Available</button>
+    <button class="btn-sm"              onclick="filterHospitals('available')"  id="f-avail">Available Only</button>
+    <button class="btn-sm"              onclick="filterHospitals('nearest')"    id="f-near">Nearest 3</button>
+  </div>
+
+  <!-- Hospital list -->
+  <div id="hospitalList"></div>
+
+  <!-- Dispatch Timeline -->
+  <div id="dispatchTimeline" style="display:none">
+    <p class="section-label" style="margin-top:20px">Dispatch Timeline</p>
+    <div class="timeline" id="timelineItems"></div>
+  </div>
+</div>
+
+<!-- Ambulance animation -->
+<img src="https://cdn-icons-png.flaticon.com/512/2966/2966327.png"
+     id="driverAmbulance" class="driver-ambulance">
+
+<script type="module" src="script.js"></script>
+</body>
+</html>
